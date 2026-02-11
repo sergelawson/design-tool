@@ -10,7 +10,18 @@ import { OpenAIProvider } from "../providers/openai.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export async function handleGenerate(ws: WebSocket, payload: any) {
+function safeSend(ws: WebSocket, data: ServerMessage): boolean {
+  if (ws.readyState !== WebSocket.OPEN) return false;
+  try {
+    console.log("Sending:", data);
+    ws.send("pong");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function handleGenerate(ws: WebSocket, payload: unknown) {
   // Validate payload
   const result = GenerateScreenSchema.safeParse(payload);
 
@@ -19,7 +30,7 @@ export async function handleGenerate(ws: WebSocket, payload: any) {
       type: "error",
       message: `Invalid payload: ${result.error.message}`,
     };
-    ws.send(JSON.stringify(errorMsg));
+    safeSend(ws, errorMsg);
     return;
   }
 
@@ -40,7 +51,7 @@ export async function handleGenerate(ws: WebSocket, payload: any) {
       type: "error",
       message: "Failed to load system prompt configuration.",
     };
-    ws.send(JSON.stringify(errorMsg));
+    safeSend(ws, errorMsg);
     return;
   }
 
@@ -54,7 +65,7 @@ export async function handleGenerate(ws: WebSocket, payload: any) {
       screenId: screen.id,
       status: "loading",
     };
-    ws.send(JSON.stringify(loadingMsg));
+    if (!safeSend(ws, loadingMsg)) break;
 
     try {
       const html = await provider.generateScreen(screen.name, screen.description, systemPrompt);
@@ -66,8 +77,7 @@ export async function handleGenerate(ws: WebSocket, payload: any) {
         status: "ready",
         html,
       };
-      console.log(`Generated screen ${screen.name} successfully.`);
-      ws.send(JSON.stringify(successMsg));
+      if (!safeSend(ws, successMsg)) break;
     } catch (error) {
       console.error(`Error generating screen ${screen.name}:`, error);
 
@@ -77,7 +87,7 @@ export async function handleGenerate(ws: WebSocket, payload: any) {
         screenId: screen.id,
         status: "error",
       };
-      ws.send(JSON.stringify(errorMsg));
+      safeSend(ws, errorMsg);
     }
   }
 }

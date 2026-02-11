@@ -1,5 +1,5 @@
 import express from "express";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import cors from "cors";
 import dotenv from "dotenv";
 import { handleGenerate } from "./handlers/generateHandler.js";
@@ -21,6 +21,10 @@ const wss = new WebSocketServer({ server });
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
+  ws.on("error", (err) => {
+    console.error("WebSocket error:", err);
+  });
+
   ws.on("message", async (message) => {
     try {
       const raw = message.toString();
@@ -34,7 +38,9 @@ wss.on("connection", (ws) => {
       }
     } catch (error) {
       console.error("Failed to parse message:", error);
-      ws.send(JSON.stringify({ type: "error", message: "Invalid JSON format" }));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "error", message: "Invalid JSON format" }));
+      }
     }
   });
 
