@@ -9,5 +9,6 @@ export const ScreenDescriptionSchema = z.object({
 export const GenerateScreenSchema = z.object({
   type: z.literal("generate_screens"),
   prompt: z.string(),
+  model: z.enum(["gpt-5.2", "gemini-3-pro"]).optional().default("gpt-5.2"),
   screens: z.array(ScreenDescriptionSchema),
 });

@@ -7,6 +7,7 @@ export type ScreenDescription = {
 export type GenerateScreenRequest = {
   type: "generate_screens";
   prompt: string;
+  model: "gpt-5.2" | "gemini-3-pro";
   screens: ScreenDescription[];
 };
 

@@ -8,7 +8,8 @@ import { mcpClient } from "@/services/mcpClient";
 import { wsClient } from "@/services/wsClient";
 
 export function InputPanel() {
-  const { prompt, setPrompt, isGenerating, setIsGenerating } = useProjectStore();
+  const { prompt, setPrompt, isGenerating, setIsGenerating, selectedModel, setSelectedModel } =
+    useProjectStore();
 
   useEffect(() => {
     wsClient.connect();
@@ -39,7 +40,7 @@ export function InputPanel() {
       screensToAdd.map((s) => s.id),
     );
 
-    mcpClient.generateScreens(prompt, screensToSend);
+    mcpClient.generateScreens(prompt, screensToSend, selectedModel);
 
     // Allow new generations while current one processes
     setIsGenerating(false);
@@ -53,6 +54,19 @@ export function InputPanel() {
       </div>
 
       <div className="flex flex-1 flex-col gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="model">Model</Label>
+          <select
+            id="model"
+            className="flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value as "gpt-5.2" | "gemini-3-pro")}
+          >
+            <option value="gpt-5.2">OpenAI GPT-5.2</option>
+            <option value="gemini-3-pro">Google Gemini 3 Pro</option>
+          </select>
+        </div>
+
         <div className="grid gap-2">
           <Label htmlFor="prompt">Screen Description</Label>
           <Textarea

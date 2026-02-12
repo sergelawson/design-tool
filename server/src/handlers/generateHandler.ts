@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { GenerateScreenSchema } from "../types/schemas.js";
 import { ServerMessage } from "../types/messages.js";
-import { OpenAIProvider } from "../providers/openai.js";
+import { LangChainProvider } from "../providers/langchain.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +21,7 @@ export async function* handleGenerate(payload: unknown) {
     return;
   }
 
-  const { screens } = result.data;
+  const { screens, model } = result.data;
 
   // Read system-prompt.md from project root
   // handler is in server/src/handlers/
@@ -42,7 +42,7 @@ export async function* handleGenerate(payload: unknown) {
     return;
   }
 
-  const provider = new OpenAIProvider();
+  const provider = new LangChainProvider(model || "gpt-5.2");
 
   // Process screens sequentially
   for (const screen of screens) {

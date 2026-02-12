@@ -28,10 +28,15 @@ export class MCPClient {
     });
   }
 
-  public generateScreens(prompt: string, screens: (ParsedScreen & { id: string })[]) {
+  public generateScreens(
+    prompt: string,
+    screens: (ParsedScreen & { id: string })[],
+    model: "gpt-5.2" | "gemini-3-pro",
+  ) {
     wsClient.send({
       type: "generate_screens",
       prompt,
+      model,
       screens,
     });
   }
