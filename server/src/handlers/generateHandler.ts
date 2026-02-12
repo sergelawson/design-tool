@@ -1,27 +1,14 @@
-import { WebSocket } from "ws";
-import { z } from "zod";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { GenerateScreenSchema } from "../types/schemas.js";
-import { ClientMessage, ServerMessage } from "../types/messages.js";
+import { ServerMessage } from "../types/messages.js";
 import { OpenAIProvider } from "../providers/openai.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function safeSend(ws: WebSocket, data: ServerMessage): boolean {
-  if (ws.readyState !== WebSocket.OPEN) return false;
-  try {
-    console.log("Sending:", data);
-    ws.send("pong");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function handleGenerate(ws: WebSocket, payload: unknown) {
+export async function* handleGenerate(payload: unknown) {
   // Validate payload
   const result = GenerateScreenSchema.safeParse(payload);
 
@@ -30,7 +17,7 @@ export async function handleGenerate(ws: WebSocket, payload: unknown) {
       type: "error",
       message: `Invalid payload: ${result.error.message}`,
     };
-    safeSend(ws, errorMsg);
+    yield errorMsg;
     return;
   }
 
@@ -51,7 +38,7 @@ export async function handleGenerate(ws: WebSocket, payload: unknown) {
       type: "error",
       message: "Failed to load system prompt configuration.",
     };
-    safeSend(ws, errorMsg);
+    yield errorMsg;
     return;
   }
 
@@ -65,7 +52,7 @@ export async function handleGenerate(ws: WebSocket, payload: unknown) {
       screenId: screen.id,
       status: "loading",
     };
-    if (!safeSend(ws, loadingMsg)) break;
+    yield loadingMsg;
 
     try {
       const html = await provider.generateScreen(screen.name, screen.description, systemPrompt);
@@ -77,7 +64,7 @@ export async function handleGenerate(ws: WebSocket, payload: unknown) {
         status: "ready",
         html,
       };
-      if (!safeSend(ws, successMsg)) break;
+      yield successMsg;
     } catch (error) {
       console.error(`Error generating screen ${screen.name}:`, error);
 
@@ -87,7 +74,7 @@ export async function handleGenerate(ws: WebSocket, payload: unknown) {
         screenId: screen.id,
         status: "error",
       };
-      safeSend(ws, errorMsg);
+      yield errorMsg;
     }
   }
 }

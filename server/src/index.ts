@@ -32,7 +32,14 @@ wss.on("connection", (ws) => {
       console.log("Received:", parsed);
 
       if (parsed.type === "generate_screens") {
-        await handleGenerate(ws, parsed);
+        for await (const msg of handleGenerate(parsed)) {
+          if (ws.readyState === WebSocket.OPEN) {
+            console.log("Sending:", msg);
+            ws.send(JSON.stringify(msg));
+          } else {
+            break;
+          }
+        }
       } else {
         console.warn("Unknown message type:", parsed.type);
       }

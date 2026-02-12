@@ -19,8 +19,10 @@ export class MCPClient {
   private setupListeners() {
     wsClient.onMessage((data: ServerMessage) => {
       if (data.type === "screen_update") {
+        console.log("Received screen update:", data);
         this.handleScreenUpdate(data as ScreenUpdateMessage);
       } else if (data.type === "error") {
+        console.log("Received error message:", data);
         this.handleError(data as ErrorMessage);
       }
     });
@@ -36,7 +38,32 @@ export class MCPClient {
 
   private handleScreenUpdate(data: ScreenUpdateMessage) {
     const { screenId, status, html } = data;
-    useCanvasStore.getState().updateScreen(screenId, { status, html });
+    console.log("[MCPClient] Handling screen update:", { screenId, status, hasHtml: !!html });
+    const store = useCanvasStore.getState();
+    const existingScreen = store.screens.find((s) => s.id === screenId);
+    console.log(
+      "[MCPClient] Screen exists:",
+      !!existingScreen,
+      "Current screens:",
+      store.screens.map((s) => s.id),
+    );
+
+    if (existingScreen) {
+      store.updateScreen(screenId, {
+        status,
+        ...(html !== undefined ? { html } : {}),
+      });
+      console.log("[MCPClient] Updated existing screen:", screenId);
+    } else {
+      store.addScreen({
+        id: screenId,
+        name: `Screen ${store.screens.length + 1}`,
+        status,
+        html: html || "",
+        position: { x: 50 + store.screens.length * 420, y: 50 },
+      });
+      console.log("[MCPClient] Added new screen:", screenId);
+    }
   }
 
   private handleError(data: ErrorMessage) {
@@ -49,7 +76,7 @@ interface ScreenUpdateMessage extends ServerMessage {
   type: "screen_update";
   screenId: string;
   status: ScreenStatus;
-  html: string;
+  html?: string;
 }
 
 interface ErrorMessage extends ServerMessage {

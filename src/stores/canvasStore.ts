@@ -18,6 +18,7 @@ export interface Screen {
 interface CanvasState {
   screens: Screen[];
   addScreen: (screen: Screen) => void;
+  addScreens: (screens: Screen[]) => void;
   updateScreen: (id: string, updates: Partial<Screen>) => void;
   removeScreen: (id: string) => void;
   updatePosition: (id: string, position: Position) => void;
@@ -25,18 +26,15 @@ interface CanvasState {
 
 export const useCanvasStore = create<CanvasState>((set) => ({
   screens: [],
-  addScreen: (screen) =>
-    set((state) => ({ screens: [...state.screens, screen] })),
+  addScreen: (screen) => set((state) => ({ screens: [...state.screens, screen] })),
+  addScreens: (screens) => set((state) => ({ screens: [...state.screens, ...screens] })),
   updateScreen: (id, updates) =>
     set((state) => ({
       screens: state.screens.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     })),
-  removeScreen: (id) =>
-    set((state) => ({ screens: state.screens.filter((s) => s.id !== id) })),
+  removeScreen: (id) => set((state) => ({ screens: state.screens.filter((s) => s.id !== id) })),
   updatePosition: (id, position) =>
     set((state) => ({
-      screens: state.screens.map((s) =>
-        s.id === id ? { ...s, position } : s
-      ),
+      screens: state.screens.map((s) => (s.id === id ? { ...s, position } : s)),
     })),
 }));

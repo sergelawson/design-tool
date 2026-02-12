@@ -16,28 +16,31 @@ export function InputPanel() {
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
-    
+
     setIsGenerating(true);
-    
+
     const parsedScreens = parsePrompt(prompt);
-    
+
     const screensToSend = parsedScreens.map((screen) => ({
       ...screen,
       id: crypto.randomUUID(),
     }));
 
-    screensToSend.forEach((screen, index) => {
-      useCanvasStore.getState().addScreen({
-        id: screen.id,
-        name: screen.name,
-        status: "loading",
-        html: "",
-        position: { x: 50 + (index * 420), y: 50 },
-      });
-    });
+    const screensToAdd = screensToSend.map((screen, index) => ({
+      id: screen.id,
+      name: screen.name,
+      status: "loading" as const,
+      html: "",
+      position: { x: 50 + index * 420, y: 50 },
+    }));
+    useCanvasStore.getState().addScreens(screensToAdd);
+    console.log(
+      "[InputPanel] Added screens to canvas:",
+      screensToAdd.map((s) => s.id),
+    );
 
     mcpClient.generateScreens(prompt, screensToSend);
-    
+
     // Allow new generations while current one processes
     setIsGenerating(false);
   };
@@ -63,9 +66,9 @@ export function InputPanel() {
       </div>
 
       <div className="mt-4">
-        <Button 
-          className="w-full" 
-          onClick={handleGenerate} 
+        <Button
+          className="w-full"
+          onClick={handleGenerate}
           disabled={!prompt.trim() || isGenerating}
           isLoading={isGenerating}
         >
