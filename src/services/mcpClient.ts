@@ -42,8 +42,13 @@ export class MCPClient {
   }
 
   private handleScreenUpdate(data: ScreenUpdateMessage) {
-    const { screenId, status, html } = data;
-    console.log("[MCPClient] Handling screen update:", { screenId, status, hasHtml: !!html });
+    const { screenId, status, html, designWidth } = data;
+    console.log("[MCPClient] Handling screen update:", {
+      screenId,
+      status,
+      hasHtml: !!html,
+      designWidth,
+    });
     const store = useCanvasStore.getState();
     const existingScreen = store.screens.find((s) => s.id === screenId);
     console.log(
@@ -57,6 +62,7 @@ export class MCPClient {
       store.updateScreen(screenId, {
         status,
         ...(html !== undefined ? { html } : {}),
+        ...(designWidth !== undefined ? { designWidth } : {}),
       });
       console.log("[MCPClient] Updated existing screen:", screenId);
     } else {
@@ -66,6 +72,7 @@ export class MCPClient {
         status,
         html: html || "",
         position: { x: 50 + store.screens.length * 420, y: 50 },
+        designWidth: designWidth || 375,
       });
       console.log("[MCPClient] Added new screen:", screenId);
     }
@@ -82,6 +89,7 @@ interface ScreenUpdateMessage extends ServerMessage {
   screenId: string;
   status: ScreenStatus;
   html?: string;
+  designWidth?: 375 | 1440;
 }
 
 interface ErrorMessage extends ServerMessage {

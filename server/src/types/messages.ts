@@ -2,6 +2,7 @@ export type ScreenDescription = {
   id: string;
   name: string;
   description: string;
+  deviceType: "mobile" | "desktop";
 };
 
 export type GenerateScreenRequest = {
@@ -18,6 +19,7 @@ export type ScreenUpdateMessage = {
   screenId: string;
   status: ScreenUpdateStatus;
   html?: string;
+  designWidth?: 375 | 1440;
 };
 
 export type ErrorMessage = {

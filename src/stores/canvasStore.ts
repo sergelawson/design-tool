@@ -13,6 +13,7 @@ export interface Screen {
   status: ScreenStatus;
   html: string;
   position: Position;
+  designWidth: 375 | 1440;
 }
 
 interface CanvasState {

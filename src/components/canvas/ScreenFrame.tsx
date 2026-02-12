@@ -19,9 +19,10 @@ interface ScreenFrameProps {
   status: ScreenStatus;
   html: string;
   position: Position;
+  designWidth: 375 | 1440;
 }
 
-export function ScreenFrame({ id, name, status, html, position }: ScreenFrameProps) {
+export function ScreenFrame({ id, name, status, html, position, designWidth }: ScreenFrameProps) {
   const removeScreen = useCanvasStore((state) => state.removeScreen);
   const updatePosition = useCanvasStore((state) => state.updatePosition);
   const [isCopied, setIsCopied] = useState(false);
@@ -87,7 +88,7 @@ export function ScreenFrame({ id, name, status, html, position }: ScreenFramePro
   return (
     <div
       className={cn(
-        "absolute z-10 flex h-[467px] w-[263px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-shadow hover:shadow-xl",
+        "absolute z-10 flex h-[667px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-shadow hover:shadow-xl",
         status === "loading" && "opacity-80",
         isDragging && "scale-[1.01] cursor-grabbing shadow-2xl",
       )}
@@ -95,6 +96,7 @@ export function ScreenFrame({ id, name, status, html, position }: ScreenFramePro
         left: position.x,
         top: position.y,
         cursor: "default",
+        width: `${designWidth}px`,
       }}
     >
       {/* Header */}

@@ -4,6 +4,7 @@ export const ScreenDescriptionSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  deviceType: z.enum(["mobile", "desktop"]).default("mobile"),
 });
 
 export const GenerateScreenSchema = z.object({

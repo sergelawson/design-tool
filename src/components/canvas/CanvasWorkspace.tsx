@@ -89,6 +89,7 @@ export function CanvasWorkspace() {
         status: "loading",
         html: "",
         position: { x, y },
+        designWidth: 375,
       });
 
       // Simulate loading for demo purposes

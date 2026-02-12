@@ -55,7 +55,14 @@ export async function* handleGenerate(payload: unknown) {
     yield loadingMsg;
 
     try {
-      const html = await provider.generateScreen(screen.name, screen.description, systemPrompt);
+      const html = await provider.generateScreen(
+        screen.name,
+        screen.description,
+        systemPrompt,
+        screen.deviceType,
+      );
+
+      const designWidth = screen.deviceType === "desktop" ? 1440 : 375;
 
       // Send success update
       const successMsg: ServerMessage = {
@@ -63,6 +70,7 @@ export async function* handleGenerate(payload: unknown) {
         screenId: screen.id,
         status: "ready",
         html,
+        designWidth,
       };
       yield successMsg;
     } catch (error) {

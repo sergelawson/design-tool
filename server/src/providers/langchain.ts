@@ -15,6 +15,7 @@ export class LangChainProvider implements LLMProvider {
     screenName: string,
     description: string,
     systemPrompt: string,
+    deviceType: "mobile" | "desktop",
   ): Promise<string> {
     let model: BaseChatModel;
 
@@ -32,9 +33,16 @@ export class LangChainProvider implements LLMProvider {
       throw new Error(`Unsupported model: ${this.modelName}`);
     }
 
+    const deviceInstruction =
+      deviceType === "desktop"
+        ? "Design this for desktop with max-width 1440px."
+        : "Design this for mobile with fixed width 375px centered.";
+
     const messages = [
       new SystemMessage(systemPrompt),
-      new HumanMessage(`Create a screen named "${screenName}". Description: ${description}`),
+      new HumanMessage(
+        `Create a screen named "${screenName}". Description: ${description}. ${deviceInstruction}`,
+      ),
     ];
 
     const response = await model.invoke(messages);

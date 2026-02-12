@@ -8,8 +8,16 @@ import { mcpClient } from "@/services/mcpClient";
 import { wsClient } from "@/services/wsClient";
 
 export function InputPanel() {
-  const { prompt, setPrompt, isGenerating, setIsGenerating, selectedModel, setSelectedModel } =
-    useProjectStore();
+  const {
+    prompt,
+    setPrompt,
+    isGenerating,
+    setIsGenerating,
+    selectedModel,
+    setSelectedModel,
+    deviceType,
+    setDeviceType,
+  } = useProjectStore();
 
   useEffect(() => {
     wsClient.connect();
@@ -25,6 +33,7 @@ export function InputPanel() {
     const screensToSend = parsedScreens.map((screen) => ({
       ...screen,
       id: crypto.randomUUID(),
+      deviceType,
     }));
 
     const screensToAdd = screensToSend.map((screen, index) => ({
@@ -33,6 +42,7 @@ export function InputPanel() {
       status: "loading" as const,
       html: "",
       position: { x: -450 + index * 300, y: -300 },
+      designWidth: (deviceType === "desktop" ? 1440 : 375) as 375 | 1440,
     }));
     useCanvasStore.getState().addScreens(screensToAdd);
     console.log(
@@ -64,6 +74,19 @@ export function InputPanel() {
           >
             <option value="gpt-5.2">OpenAI GPT-5.2</option>
             <option value="gemini-3-pro">Google Gemini 3 Pro</option>
+          </select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="deviceType">Device Type</Label>
+          <select
+            id="deviceType"
+            className="flex h-9 w-full rounded-md border border-slate-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+            value={deviceType}
+            onChange={(e) => setDeviceType(e.target.value as "mobile" | "desktop")}
+          >
+            <option value="mobile">Mobile (375px)</option>
+            <option value="desktop">Desktop (1440px)</option>
           </select>
         </div>
 
