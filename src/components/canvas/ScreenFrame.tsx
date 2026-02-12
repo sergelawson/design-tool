@@ -37,8 +37,9 @@ export function ScreenFrame({ id, name, status, html, position }: ScreenFramePro
     const startPos = { ...position };
 
     const handlePointerMove = (e: PointerEvent) => {
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
+      const zoom = useCanvasStore.getState().zoom;
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
       updatePosition(id, {
         x: startPos.x + dx,
         y: startPos.y + dy,
@@ -86,7 +87,7 @@ export function ScreenFrame({ id, name, status, html, position }: ScreenFramePro
   return (
     <div
       className={cn(
-        "absolute z-10 flex h-[667px] w-[375px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-shadow hover:shadow-xl",
+        "absolute z-10 flex h-[467px] w-[263px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-shadow hover:shadow-xl",
         status === "loading" && "opacity-80",
         isDragging && "scale-[1.01] cursor-grabbing shadow-2xl",
       )}

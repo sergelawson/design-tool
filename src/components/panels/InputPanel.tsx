@@ -31,7 +31,7 @@ export function InputPanel() {
       name: screen.name,
       status: "loading" as const,
       html: "",
-      position: { x: 50 + index * 420, y: 50 },
+      position: { x: -450 + index * 300, y: -300 },
     }));
     useCanvasStore.getState().addScreens(screensToAdd);
     console.log(

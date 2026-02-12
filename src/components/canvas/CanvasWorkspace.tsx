@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { ScreenFrame } from "./ScreenFrame";
+import { ZoomControls } from "./ZoomControls";
 import { cn } from "@/lib/utils";
 
 const CANVAS_SIZE = 8000; // Large canvas size for infinite feel
@@ -10,6 +11,9 @@ export function CanvasWorkspace() {
   const containerRef = useRef<HTMLDivElement>(null);
   const screens = useCanvasStore((state) => state.screens);
   const addScreen = useCanvasStore((state) => state.addScreen);
+  const zoom = useCanvasStore((state) => state.zoom);
+  const zoomIn = useCanvasStore((state) => state.zoomIn);
+  const zoomOut = useCanvasStore((state) => state.zoomOut);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Center the canvas on mount
@@ -27,6 +31,26 @@ export function CanvasWorkspace() {
       }, 10);
     }
   }, []);
+
+  // Handle zoom with Ctrl + Wheel
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          zoomIn();
+        } else {
+          zoomOut();
+        }
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [zoomIn, zoomOut]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -47,8 +71,14 @@ export function CanvasWorkspace() {
       const scrollLeft = containerRef.current.scrollLeft;
       const scrollTop = containerRef.current.scrollTop;
 
-      const x = e.clientX - rect.left + scrollLeft - CENTER_OFFSET;
-      const y = e.clientY - rect.top + scrollTop - CENTER_OFFSET;
+      // Adjust for zoom:
+      // The visual distance from center is (screen - center_offset).
+      // We divide by zoom to get the world coordinate.
+      const rawX = e.clientX - rect.left + scrollLeft - CENTER_OFFSET;
+      const rawY = e.clientY - rect.top + scrollTop - CENTER_OFFSET;
+
+      const x = rawX / zoom;
+      const y = rawY / zoom;
 
       // Placeholder: Create a new screen at drop location
       // In a real app, we'd check what's being dropped
@@ -76,34 +106,42 @@ export function CanvasWorkspace() {
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="relative h-full w-full overflow-auto bg-gray-50"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className="relative h-full w-full overflow-hidden">
       <div
-        className={cn(
-          "relative min-h-full min-w-full transition-colors",
-          isDraggingOver ? "bg-blue-50/50" : "",
-        )}
-        style={{
-          backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
-          backgroundSize: "20px 20px",
-        }}
+        ref={containerRef}
+        className="relative h-full w-full overflow-auto bg-gray-50"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
-        {/* Render content relative to center */}
-        <div className="absolute left-1/2 top-1/2" style={{ transform: "translate(-50%, -50%)" }}>
-          {/* 
-                We render screens relative to the center point. 
+        <div
+          className={cn(
+            "relative min-h-full min-w-full transition-colors",
+            isDraggingOver ? "bg-blue-50/50" : "",
+          )}
+          style={{
+            backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`, // Scale grid with zoom
+          }}
+        >
+          {/* Render content relative to center */}
+          <div
+            className="absolute left-1/2 top-1/2 origin-center"
+            style={{
+              transform: `translate(-50%, -50%) scale(${zoom})`,
+            }}
+          >
+            {/*
+                We render screens relative to the center point.
                 This means a screen at {x:0, y:0} will be at the exact center of the large canvas.
             */}
-          {screens.map((screen) => {
-            return <ScreenFrame key={screen.id} {...screen} />;
-          })}
+            {screens.map((screen) => {
+              return <ScreenFrame key={screen.id} {...screen} />;
+            })}
+          </div>
         </div>
       </div>
+      <ZoomControls />
     </div>
   );
 }
