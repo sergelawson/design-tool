@@ -35,7 +35,7 @@ export class LangChainProvider implements LLMProvider {
 
     const deviceInstruction =
       deviceType === "desktop"
-        ? "Design this for desktop with max-width 1440px."
+        ? "Design this for desktop with max-width 1280px."
         : "Design this for mobile with fixed width 375px centered.";
 
     const messages = [

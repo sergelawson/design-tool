@@ -19,7 +19,7 @@ interface ScreenFrameProps {
   status: ScreenStatus;
   html: string;
   position: Position;
-  designWidth: 375 | 1440;
+  designWidth: 375 | 1280;
 }
 
 export function ScreenFrame({ id, name, status, html, position, designWidth }: ScreenFrameProps) {
@@ -27,6 +27,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
   const updatePosition = useCanvasStore((state) => state.updatePosition);
   const [isCopied, setIsCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const frameHeight = designWidth === 1280 ? 800 : 812;
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("button")) return;
@@ -88,7 +89,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
   return (
     <div
       className={cn(
-        "absolute z-10 flex h-[667px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg transition-shadow hover:shadow-xl",
+        "absolute z-10 flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-transparent transition-shadow hover:shadow-xl",
         status === "loading" && "opacity-80",
         isDragging && "scale-[1.01] cursor-grabbing shadow-2xl",
       )}
@@ -101,6 +102,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
     >
       {/* Header */}
       <div
+        id="frame-header"
         className="handle flex cursor-move select-none items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-2"
         onPointerDown={handlePointerDown}
       >
@@ -146,7 +148,10 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
       </div>
 
       {/* Content */}
-      <div className="relative flex-1 overflow-hidden bg-white">
+      <div
+        className="relative overflow-hidden bg-transparent"
+        style={{ height: `${frameHeight}px` }}
+      >
         {status === "loading" ? (
           <div className="flex h-full items-center justify-center text-gray-400">Generating...</div>
         ) : status === "error" ? (
@@ -158,7 +163,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
           <iframe
             srcDoc={html}
             title={name}
-            className="h-full w-full border-0 bg-white"
+            className="h-full w-full border-0 bg-transparent"
             sandbox="allow-scripts allow-same-origin allow-forms"
             style={{ display: "block", minHeight: "100%" }}
           />

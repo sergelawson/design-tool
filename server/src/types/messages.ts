@@ -19,7 +19,7 @@ export type ScreenUpdateMessage = {
   screenId: string;
   status: ScreenUpdateStatus;
   html?: string;
-  designWidth?: 375 | 1440;
+  designWidth?: 375 | 1280;
 };
 
 export type ErrorMessage = {

@@ -89,7 +89,7 @@ interface ScreenUpdateMessage extends ServerMessage {
   screenId: string;
   status: ScreenStatus;
   html?: string;
-  designWidth?: 375 | 1440;
+  designWidth?: 375 | 1280;
 }
 
 interface ErrorMessage extends ServerMessage {

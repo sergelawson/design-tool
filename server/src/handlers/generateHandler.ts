@@ -62,7 +62,7 @@ export async function* handleGenerate(payload: unknown) {
         screen.deviceType,
       );
 
-      const designWidth = screen.deviceType === "desktop" ? 1440 : 375;
+      const designWidth = screen.deviceType === "desktop" ? 1280 : 375;
 
       // Send success update
       const successMsg: ServerMessage = {

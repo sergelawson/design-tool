@@ -42,7 +42,7 @@ export function InputPanel() {
       status: "loading" as const,
       html: "",
       position: { x: -450 + index * 300, y: -300 },
-      designWidth: (deviceType === "desktop" ? 1440 : 375) as 375 | 1440,
+      designWidth: (deviceType === "desktop" ? 1280 : 375) as 375 | 1280,
     }));
     useCanvasStore.getState().addScreens(screensToAdd);
     console.log(
@@ -86,7 +86,7 @@ export function InputPanel() {
             onChange={(e) => setDeviceType(e.target.value as "mobile" | "desktop")}
           >
             <option value="mobile">Mobile (375px)</option>
-            <option value="desktop">Desktop (1440px)</option>
+            <option value="desktop">Desktop (1280px)</option>
           </select>
         </div>
 
