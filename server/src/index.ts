@@ -1,57 +1,95 @@
-import express from "express";
-import WebSocket, { WebSocketServer } from "ws";
-import cors from "cors";
+import { serve } from "@hono/node-server";
+import { createNodeWebSocket } from "@hono/node-ws";
+import { cors } from "hono/cors";
+import { Hono } from "hono";
 import dotenv from "dotenv";
 import { handleGenerate } from "./handlers/generateHandler.js";
 
 dotenv.config();
 
-const app = express();
+const app = new Hono();
 const PORT = process.env.PORT || 3001;
+const OPEN_READY_STATE = 1;
 
-app.use(cors());
-app.use(express.json());
+app.use("/health", cors());
 
-const server = app.listen(PORT, () => {
-  console.log(`MCP Server running on http://localhost:${PORT}`);
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+function toRawMessage(data: unknown): string {
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString("utf-8");
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf-8");
+  }
+
+  if (typeof SharedArrayBuffer !== "undefined" && data instanceof SharedArrayBuffer) {
+    return Buffer.from(data).toString("utf-8");
+  }
+
+  throw new Error("Unsupported WebSocket message format");
+}
+
+app.get("/health", (c) => {
+  return c.json({ status: "ok" });
 });
 
-const wss = new WebSocketServer({ server });
+app.get(
+  "/",
+  upgradeWebSocket(() => {
+    console.log("Client connected");
 
-wss.on("connection", (ws) => {
-  console.log("Client connected");
+    return {
+      onClose: () => {
+        console.log("Client disconnected");
+      },
+      onError: (event) => {
+        console.error("WebSocket error:", event);
+      },
+      onMessage: (event, ws) => {
+        void (async () => {
+          try {
+            const raw = toRawMessage(event.data);
+            const parsed = JSON.parse(raw);
+            console.log("Received:", parsed);
 
-  ws.on("error", (err) => {
-    console.error("WebSocket error:", err);
-  });
-
-  ws.on("message", async (message) => {
-    try {
-      const raw = message.toString();
-      const parsed = JSON.parse(raw);
-      console.log("Received:", parsed);
-
-      if (parsed.type === "generate_screens") {
-        for await (const msg of handleGenerate(parsed)) {
-          if (ws.readyState === WebSocket.OPEN) {
-            console.log("Sending:", msg);
-            ws.send(JSON.stringify(msg));
-          } else {
-            break;
+            if (parsed.type === "generate_screens") {
+              for await (const msg of handleGenerate(parsed)) {
+                if (ws.readyState === OPEN_READY_STATE) {
+                  console.log("Sending:", msg);
+                  ws.send(JSON.stringify(msg));
+                } else {
+                  break;
+                }
+              }
+            } else {
+              console.warn("Unknown message type:", parsed.type);
+            }
+          } catch (error) {
+            console.error("Failed to parse message:", error);
+            if (ws.readyState === OPEN_READY_STATE) {
+              ws.send(JSON.stringify({ type: "error", message: "Invalid JSON format" }));
+            }
           }
-        }
-      } else {
-        console.warn("Unknown message type:", parsed.type);
-      }
-    } catch (error) {
-      console.error("Failed to parse message:", error);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "error", message: "Invalid JSON format" }));
-      }
-    }
-  });
+        })();
+      },
+    };
+  }),
+);
 
-  ws.on("close", () => {
-    console.log("Client disconnected");
-  });
-});
+const server = serve(
+  {
+    fetch: app.fetch,
+    port: Number(PORT),
+  },
+  () => {
+    console.log(`MCP Server running on http://localhost:${PORT}`);
+  },
+);
+
+injectWebSocket(server);

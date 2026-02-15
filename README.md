@@ -3,12 +3,14 @@
 A Figma-like AI design tool that generates Tailwind UI screens from text prompts.
 
 ## Features
+
 - **AI Generation**: Powered by OpenAI (GPT-4) and MCP.
 - **Infinite Canvas**: Draggable, scrollable workspace.
 - **Drag & Drop**: Arrange screens freely.
 - **Export**: Download HTML code for any screen.
 
 ## Setup
+
 1. Install dependencies:
    ```bash
    pnpm install
@@ -23,9 +25,11 @@ A Figma-like AI design tool that generates Tailwind UI screens from text prompts
    This starts both the React frontend (localhost:5173) and MCP server (localhost:3001).
 
 ## Tech Stack
+
 - **Frontend**: React, Vite, Tailwind, Zustand
-- **Backend**: Node.js, Express, WebSocket, OpenAI SDK
+- **Backend**: Node.js, Hono, WebSocket, OpenAI SDK
 
 ## Project Structure
+
 - `src/`: Frontend source
 - `server/`: Backend MCP server source
