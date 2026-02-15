@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { Button, Textarea, Label } from "@/components/ui";
 import { Wand2 } from "lucide-react";
 import { parsePrompt } from "@/utils/promptParser";
+import { getGeneratedScreenPositions } from "@/utils/screenLayout";
 import { mcpClient } from "@/services/mcpClient";
 import { wsClient } from "@/services/wsClient";
 
@@ -36,13 +37,16 @@ export function InputPanel() {
       deviceType,
     }));
 
+    const designWidth = (deviceType === "desktop" ? 1280 : 375) as 375 | 1280;
+    const generatedPositions = getGeneratedScreenPositions(screensToSend.length, designWidth);
+
     const screensToAdd = screensToSend.map((screen, index) => ({
       id: screen.id,
       name: screen.name,
       status: "loading" as const,
       html: "",
-      position: { x: -450 + index * 300, y: -300 },
-      designWidth: (deviceType === "desktop" ? 1280 : 375) as 375 | 1280,
+      position: generatedPositions[index] ?? { x: 0, y: 0 },
+      designWidth,
     }));
     useCanvasStore.getState().addScreens(screensToAdd);
     console.log(

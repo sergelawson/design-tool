@@ -1,148 +1,396 @@
-import { useEffect, useRef, useState } from "react";
-import { useCanvasStore } from "@/stores/canvasStore";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Screen, useCanvasStore } from "@/stores/canvasStore";
+import { useCanvasCameraStore } from "@/stores/canvasCameraStore";
+import {
+  easeOutCubic,
+  getBoundsCenter,
+  getVisibleWorldRect,
+  rectIntersects,
+  zoomAtViewportPoint,
+} from "@/utils/cameraMath";
+import { getScreenFrameDimensions } from "@/utils/screenLayout";
+
 import { ScreenFrame } from "./ScreenFrame";
 import { ZoomControls } from "./ZoomControls";
-import { cn } from "@/lib/utils";
 
-const CANVAS_SIZE = 8000; // Large canvas size for infinite feel
-const CENTER_OFFSET = CANVAS_SIZE / 2;
+const GRID_SIZE = 20;
+const ZOOM_STEP = 0.1;
+const VISIBILITY_MARGIN = 16;
+const AUTO_FOCUS_DURATION_MS = 220;
+
+type ViewportSize = {
+  width: number;
+  height: number;
+};
+
+type WorldRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+function getScreenWorldRect(screen: Screen): WorldRect {
+  const dimensions = getScreenFrameDimensions(screen.designWidth);
+
+  return {
+    left: screen.position.x,
+    top: screen.position.y,
+    right: screen.position.x + dimensions.width,
+    bottom: screen.position.y + dimensions.height,
+  };
+}
+
+function getBoundsForScreens(screens: Screen[]): WorldRect | null {
+  if (screens.length === 0) {
+    return null;
+  }
+
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+
+  for (const screen of screens) {
+    const rect = getScreenWorldRect(screen);
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  }
+
+  return { left, top, right, bottom };
+}
 
 export function CanvasWorkspace() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const screens = useCanvasStore((state) => state.screens);
-  const addScreen = useCanvasStore((state) => state.addScreen);
-  const zoom = useCanvasStore((state) => state.zoom);
-  const zoomIn = useCanvasStore((state) => state.zoomIn);
-  const zoomOut = useCanvasStore((state) => state.zoomOut);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const previousScreenIdsRef = useRef<string[]>([]);
 
-  // Center the canvas on mount
-  useEffect(() => {
-    if (containerRef.current) {
-      const { clientWidth, clientHeight } = containerRef.current;
-      setTimeout(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTo({
-            left: CENTER_OFFSET - clientWidth / 2,
-            top: CENTER_OFFSET - clientHeight / 2,
-            behavior: "auto", // Immediate jump without animation
-          });
+  const screens = useCanvasStore((state) => state.screens);
+  const updatePosition = useCanvasStore((state) => state.updatePosition);
+  const removeScreen = useCanvasStore((state) => state.removeScreen);
+
+  const camera = useCanvasCameraStore((state) => state.camera);
+  const setCamera = useCanvasCameraStore((state) => state.setCamera);
+  const panBy = useCanvasCameraStore((state) => state.panBy);
+
+  const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+
+  const worldTransform = useMemo(
+    () =>
+      `translate(${viewport.width / 2}px, ${viewport.height / 2}px) scale(${camera.zoom}) translate(${-camera.x}px, ${-camera.y}px)`,
+    [camera.x, camera.y, camera.zoom, viewport.height, viewport.width],
+  );
+
+  const gridStyle = useMemo(
+    () => ({
+      backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
+      backgroundSize: `${GRID_SIZE * camera.zoom}px ${GRID_SIZE * camera.zoom}px`,
+      backgroundPosition: `${viewport.width / 2 - camera.x * camera.zoom}px ${viewport.height / 2 - camera.y * camera.zoom}px`,
+    }),
+    [camera.x, camera.y, camera.zoom, viewport.height, viewport.width],
+  );
+
+  const hasVisibleScreen = useCallback(
+    (targetCamera = camera): boolean => {
+      if (screens.length === 0 || viewport.width === 0 || viewport.height === 0) {
+        return false;
+      }
+
+      const visibleRect = getVisibleWorldRect(targetCamera, viewport);
+
+      return screens.some((screen) => {
+        const screenRect = getScreenWorldRect(screen);
+        return rectIntersects(visibleRect, screenRect, VISIBILITY_MARGIN);
+      });
+    },
+    [camera, screens, viewport],
+  );
+
+  const animateCameraTo = useCallback(
+    (target: { x: number; y: number; zoom: number }, duration = AUTO_FOCUS_DURATION_MS) => {
+      const startCamera = useCanvasCameraStore.getState().camera;
+      const startTime = performance.now();
+
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      const step = (now: number) => {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = easeOutCubic(progress);
+
+        setCamera({
+          x: startCamera.x + (target.x - startCamera.x) * eased,
+          y: startCamera.y + (target.y - startCamera.y) * eased,
+          zoom: startCamera.zoom + (target.zoom - startCamera.zoom) * eased,
+        });
+
+        if (progress < 1) {
+          animationFrameRef.current = window.requestAnimationFrame(step);
+          return;
         }
-      }, 10);
+
+        animationFrameRef.current = null;
+      };
+
+      animationFrameRef.current = window.requestAnimationFrame(step);
+    },
+    [setCamera],
+  );
+
+  const focusScreens = useCallback(
+    (targetScreens: Screen[], options?: { animated?: boolean; zoom?: number }) => {
+      const bounds = getBoundsForScreens(targetScreens);
+      if (!bounds) {
+        return;
+      }
+
+      const center = getBoundsCenter(bounds);
+      const targetZoom = options?.zoom ?? useCanvasCameraStore.getState().camera.zoom;
+
+      if (options?.animated === false) {
+        setCamera({ x: center.x, y: center.y, zoom: targetZoom });
+        return;
+      }
+
+      animateCameraTo({ x: center.x, y: center.y, zoom: targetZoom });
+    },
+    [animateCameraTo, setCamera],
+  );
+
+  const recoverIfNothingVisible = useCallback(() => {
+    if (screens.length === 0 || isPanning) {
+      return;
     }
+
+    if (hasVisibleScreen()) {
+      return;
+    }
+
+    focusScreens(screens, { animated: true });
+  }, [focusScreens, hasVisibleScreen, isPanning, screens]);
+
+  useEffect(() => {
+    const viewportElement = viewportRef.current;
+    if (!viewportElement) {
+      return;
+    }
+
+    const updateViewport = () => {
+      setViewport({ width: viewportElement.clientWidth, height: viewportElement.clientHeight });
+    };
+
+    updateViewport();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateViewport();
+    });
+
+    resizeObserver.observe(viewportElement);
+
+    return () => resizeObserver.disconnect();
   }, []);
 
-  // Handle zoom with Ctrl + Wheel
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const previousIds = previousScreenIdsRef.current;
+    const previousSet = new Set(previousIds);
+    const addedScreens = screens.filter((screen) => !previousSet.has(screen.id));
 
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        if (e.deltaY < 0) {
-          zoomIn();
-        } else {
-          zoomOut();
-        }
+    previousScreenIdsRef.current = screens.map((screen) => screen.id);
+
+    if (addedScreens.length > 0) {
+      focusScreens(addedScreens, { animated: true });
+      return;
+    }
+
+    recoverIfNothingVisible();
+  }, [focusScreens, recoverIfNothingVisible, screens]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  const handleZoomToPoint = useCallback(
+    (nextZoom: number, point: { x: number; y: number }) => {
+      if (viewport.width === 0 || viewport.height === 0) {
+        return;
+      }
+
+      const nextCamera = zoomAtViewportPoint(camera, viewport, point, nextZoom);
+      setCamera(nextCamera);
+    },
+    [camera, setCamera, viewport],
+  );
+
+  const handleZoomIn = useCallback(() => {
+    handleZoomToPoint(camera.zoom + ZOOM_STEP, { x: viewport.width / 2, y: viewport.height / 2 });
+  }, [camera.zoom, handleZoomToPoint, viewport.height, viewport.width]);
+
+  const handleZoomOut = useCallback(() => {
+    handleZoomToPoint(camera.zoom - ZOOM_STEP, { x: viewport.width / 2, y: viewport.height / 2 });
+  }, [camera.zoom, handleZoomToPoint, viewport.height, viewport.width]);
+
+  const handleResetZoom = useCallback(() => {
+    const nextCamera = { ...camera, zoom: 1 };
+    setCamera(nextCamera);
+
+    window.requestAnimationFrame(() => {
+      if (!hasVisibleScreen(nextCamera)) {
+        focusScreens(screens, { animated: true, zoom: 1 });
+      }
+    });
+  }, [camera, focusScreens, hasVisibleScreen, screens, setCamera]);
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if ((event.target as HTMLElement).closest("[data-screen-frame='true']")) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsPanning(true);
+
+      const pointerId = event.pointerId;
+      let lastX = event.clientX;
+      let lastY = event.clientY;
+
+      const wrappedPointerMove = (moveEvent: PointerEvent) => {
+        const dx = (moveEvent.clientX - lastX) / useCanvasCameraStore.getState().camera.zoom;
+        const dy = (moveEvent.clientY - lastY) / useCanvasCameraStore.getState().camera.zoom;
+        panBy(-dx, -dy);
+        lastX = moveEvent.clientX;
+        lastY = moveEvent.clientY;
+      };
+
+      const handlePointerUp = () => {
+        setIsPanning(false);
+        window.removeEventListener("pointermove", wrappedPointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+        window.removeEventListener("pointercancel", handlePointerUp);
+      };
+
+      event.currentTarget.setPointerCapture(pointerId);
+      window.addEventListener("pointermove", wrappedPointerMove, { passive: true });
+      window.addEventListener("pointerup", handlePointerUp);
+      window.addEventListener("pointercancel", handlePointerUp);
+    },
+    [panBy],
+  );
+
+  useEffect(() => {
+    const viewportElement = viewportRef.current;
+    if (!viewportElement) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+
+      const rect = viewportElement.getBoundingClientRect();
+      const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+
+      if (event.ctrlKey || event.metaKey) {
+        const intensity = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 0.045 : 0.0025;
+        const scale = Math.exp(-event.deltaY * intensity);
+        handleZoomToPoint(camera.zoom * scale, point);
+        return;
+      }
+
+      const zoom = useCanvasCameraStore.getState().camera.zoom;
+      panBy(event.deltaX / zoom, event.deltaY / zoom);
+    };
+
+    viewportElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => viewportElement.removeEventListener("wheel", handleWheel);
+  }, [camera.zoom, handleZoomToPoint, panBy]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.key === "=" || event.key === "+") {
+        event.preventDefault();
+        handleZoomIn();
+        return;
+      }
+
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        handleZoomOut();
+        return;
+      }
+
+      if (event.key === "0") {
+        event.preventDefault();
+        handleResetZoom();
       }
     };
 
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [zoomIn, zoomOut]);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDraggingOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDraggingOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDraggingOver(false);
-
-    // Calculate drop position relative to the canvas center
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const scrollLeft = containerRef.current.scrollLeft;
-      const scrollTop = containerRef.current.scrollTop;
-
-      // Adjust for zoom:
-      // The visual distance from center is (screen - center_offset).
-      // We divide by zoom to get the world coordinate.
-      const rawX = e.clientX - rect.left + scrollLeft - CENTER_OFFSET;
-      const rawY = e.clientY - rect.top + scrollTop - CENTER_OFFSET;
-
-      const x = rawX / zoom;
-      const y = rawY / zoom;
-
-      // Placeholder: Create a new screen at drop location
-      // In a real app, we'd check what's being dropped
-      const newScreenId = crypto.randomUUID();
-      addScreen({
-        id: newScreenId,
-        name: `Screen ${screens.length + 1}`,
-        status: "loading",
-        html: "",
-        position: { x, y },
-        designWidth: 375,
-      });
-
-      // Simulate loading for demo purposes
-      setTimeout(() => {
-        useCanvasStore.getState().updateScreen(newScreenId, {
-          status: "ready",
-          html: `<div style="padding: 20px; font-family: sans-serif;">
-            <h1 class="text-2xl font-bold mb-4">New Screen</h1>
-            <p class="text-gray-600">This is a placeholder for AI-generated content.</p>
-            <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Click Me</button>
-          </div>`,
-        });
-      }, 2000);
-    }
-  };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleResetZoom, handleZoomIn, handleZoomOut]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div
-        ref={containerRef}
-        className="relative h-full w-full overflow-auto bg-gray-50"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        ref={viewportRef}
+        className={cn(
+          "relative h-full w-full overflow-hidden bg-gray-50",
+          isPanning && "cursor-grabbing",
+        )}
+        onPointerDown={handlePointerDown}
       >
+        <div className="absolute inset-0" style={gridStyle} />
+
         <div
-          className={cn(
-            "relative min-h-full min-w-full transition-colors",
-            isDraggingOver ? "bg-blue-50/50" : "",
-          )}
-          style={{
-            backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)",
-            backgroundSize: `${20 * zoom}px ${20 * zoom}px`, // Scale grid with zoom
-          }}
+          className="absolute left-0 top-0 h-full w-full origin-top-left"
+          style={{ transform: worldTransform, willChange: "transform" }}
         >
-          {/* Render content relative to center */}
-          <div
-            className="absolute left-1/2 top-1/2 origin-center"
-            style={{
-              transform: `translate(-50%, -50%) scale(${zoom})`,
-            }}
-          >
-            {/*
-                We render screens relative to the center point.
-                This means a screen at {x:0, y:0} will be at the exact center of the large canvas.
-            */}
-            {screens.map((screen) => {
-              return <ScreenFrame key={screen.id} {...screen} />;
-            })}
-          </div>
+          {screens.map((screen) => {
+            return (
+              <ScreenFrame
+                key={screen.id}
+                id={screen.id}
+                name={screen.name}
+                status={screen.status}
+                html={screen.html}
+                position={screen.position}
+                designWidth={screen.designWidth}
+                zoom={camera.zoom}
+                onUpdatePosition={updatePosition}
+                onRemove={removeScreen}
+              />
+            );
+          })}
         </div>
       </div>
-      <ZoomControls />
+
+      <ZoomControls
+        zoom={camera.zoom}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onResetZoom={handleResetZoom}
+      />
     </div>
   );
 }

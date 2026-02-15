@@ -1,5 +1,4 @@
-import { ScreenStatus, Position } from "@/stores/canvasStore";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 import {
   GripVertical,
   X,
@@ -10,8 +9,8 @@ import {
   Download,
   Check,
 } from "lucide-react";
-import { useCanvasStore } from "@/stores/canvasStore";
-import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Position, ScreenStatus } from "@/stores/canvasStore";
 
 interface ScreenFrameProps {
   id: string;
@@ -20,11 +19,22 @@ interface ScreenFrameProps {
   html: string;
   position: Position;
   designWidth: 375 | 1280;
+  zoom: number;
+  onUpdatePosition: (id: string, position: Position) => void;
+  onRemove: (id: string) => void;
 }
 
-export function ScreenFrame({ id, name, status, html, position, designWidth }: ScreenFrameProps) {
-  const removeScreen = useCanvasStore((state) => state.removeScreen);
-  const updatePosition = useCanvasStore((state) => state.updatePosition);
+export function ScreenFrame({
+  id,
+  name,
+  status,
+  html,
+  position,
+  designWidth,
+  zoom,
+  onUpdatePosition,
+  onRemove,
+}: ScreenFrameProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const frameHeight = designWidth === 1280 ? 800 : 812;
@@ -37,25 +47,49 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
     const startX = e.clientX;
     const startY = e.clientY;
     const startPos = { ...position };
+    let rafId: number | null = null;
+    let pendingPosition: Position | null = null;
+
+    const flushPendingPosition = () => {
+      if (!pendingPosition) {
+        return;
+      }
+
+      onUpdatePosition(id, pendingPosition);
+      pendingPosition = null;
+    };
 
     const handlePointerMove = (e: PointerEvent) => {
-      const zoom = useCanvasStore.getState().zoom;
       const dx = (e.clientX - startX) / zoom;
       const dy = (e.clientY - startY) / zoom;
-      updatePosition(id, {
+      pendingPosition = {
         x: startPos.x + dx,
         y: startPos.y + dy,
-      });
+      };
+
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(() => {
+          flushPendingPosition();
+          rafId = null;
+        });
+      }
     };
 
     const handlePointerUp = () => {
       setIsDragging(false);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      flushPendingPosition();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
 
-    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
     window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
   };
 
   const handleCopy = async () => {
@@ -88,6 +122,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
 
   return (
     <div
+      data-screen-frame="true"
       className={cn(
         "absolute z-10 flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-transparent transition-shadow hover:shadow-xl",
         status === "loading" && "opacity-80",
@@ -102,7 +137,6 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
     >
       {/* Header */}
       <div
-        id="frame-header"
         className="handle flex cursor-move select-none items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-2"
         onPointerDown={handlePointerDown}
       >
@@ -138,7 +172,7 @@ export function ScreenFrame({ id, name, status, html, position, designWidth }: S
           )}
           {statusIcon[status]}
           <button
-            onClick={() => removeScreen(id)}
+            onClick={() => onRemove(id)}
             className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600"
             aria-label="Remove screen"
           >

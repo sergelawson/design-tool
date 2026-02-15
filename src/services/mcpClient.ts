@@ -1,6 +1,8 @@
-import { wsClient, ServerMessage } from "./wsClient";
 import { ParsedScreen } from "@/utils/promptParser";
 import { useCanvasStore, ScreenStatus } from "@/stores/canvasStore";
+import { getGeneratedScreenPositions } from "@/utils/screenLayout";
+
+import { wsClient, ServerMessage } from "./wsClient";
 
 export class MCPClient {
   private static instance: MCPClient;
@@ -66,13 +68,20 @@ export class MCPClient {
       });
       console.log("[MCPClient] Updated existing screen:", screenId);
     } else {
+      const resolvedDesignWidth = designWidth ?? 375;
+      const generatedPositions = getGeneratedScreenPositions(
+        store.screens.length + 1,
+        resolvedDesignWidth,
+      );
+      const position = generatedPositions[generatedPositions.length - 1] ?? { x: 0, y: 0 };
+
       store.addScreen({
         id: screenId,
         name: `Screen ${store.screens.length + 1}`,
         status,
         html: html || "",
-        position: { x: 50 + store.screens.length * 420, y: 50 },
-        designWidth: designWidth || 375,
+        position,
+        designWidth: resolvedDesignWidth,
       });
       console.log("[MCPClient] Added new screen:", screenId);
     }

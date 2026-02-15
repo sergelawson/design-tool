@@ -1,13 +1,17 @@
-import { useCanvasStore } from "@/stores/canvasStore";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 
-export function ZoomControls() {
-  const { zoom, zoomIn, zoomOut, resetZoom } = useCanvasStore();
+interface ZoomControlsProps {
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
+}
 
+export function ZoomControls({ zoom, onZoomIn, onZoomOut, onResetZoom }: ZoomControlsProps) {
   return (
     <div className="absolute bottom-6 right-6 flex items-center gap-2 rounded-lg border border-gray-200 bg-white/90 p-2 shadow-lg backdrop-blur-sm">
       <button
-        onClick={zoomOut}
+        onClick={onZoomOut}
         className="rounded p-1.5 text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
         title="Zoom Out (Ctrl/Cmd + -)"
         aria-label="Zoom Out"
@@ -20,7 +24,7 @@ export function ZoomControls() {
       </span>
 
       <button
-        onClick={zoomIn}
+        onClick={onZoomIn}
         className="rounded p-1.5 text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
         title="Zoom In (Ctrl/Cmd + +)"
         aria-label="Zoom In"
@@ -31,7 +35,7 @@ export function ZoomControls() {
       <div className="mx-1 h-4 w-px bg-gray-300" />
 
       <button
-        onClick={resetZoom}
+        onClick={onResetZoom}
         className="rounded p-1.5 text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
         title="Reset Zoom (Ctrl/Cmd + 0)"
         aria-label="Reset Zoom"
