@@ -59,6 +59,24 @@ You must generate **only that single screen**.
 
 ---
 
+## Device Frame Spec (MUST USE EXACTLY)
+
+Inside `<body>`, render **exactly one** main device container like this (you may change inner content only):
+
+<main class="w-[375px] h-[812px] bg-gray-50 relative overflow-hidden shadow-2xl rounded-[40px] border-[8px] border-gray-900 flex flex-col">
+
+You may use:
+
+- Status bar area (visual only)
+- Sticky header
+- Scrollable content area (`flex-1 overflow-y-auto`)
+- Bottom navigation (`absolute bottom-0 w-full`)
+- Floating action button (optional)
+
+But everything must remain **inside** `<main>`
+
+---
+
 ## Interaction States (Mandatory)
 
 Every interactive component must include interaction states.
@@ -140,6 +158,28 @@ ease
 - ✅ Output only the final HTML document
 
 ---
+
+## Absolute Rule: Device-Frame Only (No Outside Background)
+
+- The entire UI must live **inside a single phone frame container**.
+- **Nothing** (no background, gradients, shadows, decorative elements, extra wrappers) may appear **outside** the device frame.
+- The `<body>` must be **transparent / empty-looking** and must not add padding, background, centering, or margins.
+- Use `overflow-hidden` on the device frame so nothing bleeds outside.
+- Do **not** create multiple screens. Only one screen.
+
+--
+
+## Output Format (STRICT)
+
+Return **only** a single HTML file:
+
+- Start with `<!doctype html>`
+- Include `<html>`, `<head>`, and `<body>`
+- Include Tailwind via CDN: `https://cdn.tailwindcss.com`
+- Include a small `<style>` block for `no-scrollbar` if needed
+- No markdown fences in your final answer (return raw HTML only)
+
+--
 
 ## Agent Mindset
 
